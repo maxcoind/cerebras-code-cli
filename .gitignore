@@ -19,3 +19,4 @@ opencode.json
 a.out
 target
 wrangler-telemetry.local.toml
+logs
