@@ -13,6 +13,8 @@ import { SessionStatus } from "./status"
 import { Plugin } from "@/plugin"
 import { Provider } from "@/provider/provider"
 import { Telemetry } from "@/telemetry"
+import { Config } from "@/config/config"
+import { checkLimit, recordRequest, recordTokens, RateLimitExceededError } from "@/ratelimit"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -53,6 +55,26 @@ export namespace SessionProcessor {
         log.info("process")
         while (true) {
           try {
+            const rateLimits = await Config.getRateLimits(input.model.providerID, input.model.id)
+
+            if (rateLimits) {
+              const checkResult = await checkLimit(input.model.providerID, input.model.id, rateLimits)
+
+              if (!checkResult.allowed) {
+                const error = checkResult.error!
+                throw new RateLimitExceededError({
+                  message: `Rate limit exceeded: ${error.limit} ${error.metric} per ${error.window}`,
+                  window: error.window,
+                  metric: error.metric,
+                  limit: error.limit,
+                  current: error.current,
+                  retryAfterMs: error.retryAfterMs,
+                })
+              }
+
+              await recordRequest(input.model.providerID, input.model.id, Object.keys(rateLimits))
+            }
+
             let currentText: MessageV2.TextPart | undefined
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
             const stream = streamText(streamInput)
@@ -270,6 +292,18 @@ export namespace SessionProcessor {
                     cost: usage.cost,
                   })
                   await Session.updateMessage(input.assistantMessage)
+
+                  const rateLimits = await Config.getRateLimits(input.model.providerID, input.model.id)
+                  if (rateLimits) {
+                    await recordTokens(
+                      input.model.providerID,
+                      input.model.id,
+                      Object.keys(rateLimits),
+                      usage.tokens.input,
+                      usage.tokens.output,
+                      usage.tokens.reasoning,
+                    )
+                  }
 
                   // Track telemetry for this step with session-level totals
                   // Compute cumulative session totals (like the sidebar displays)

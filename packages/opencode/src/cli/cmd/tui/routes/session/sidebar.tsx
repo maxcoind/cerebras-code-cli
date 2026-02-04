@@ -12,6 +12,7 @@ import { useKeybind } from "../../context/keybind"
 import { useDirectory } from "../../context/directory"
 import { useDialog } from "../../ui/dialog"
 import { DialogRateLimit } from "../../component/dialog-rate-limit"
+import { getUsage } from "@/ratelimit"
 
 // Threshold for low cache hit rate warning
 const LOW_CACHE_HIT_THRESHOLD = 40
@@ -25,24 +26,16 @@ function percentToBar(percent: number): string {
 }
 
 // Row with label and horizontal bar for rate limits
-function RateLimitRow(props: {
-  remaining: number
-  limit: number
-  window: string
-}) {
+function RateLimitRow(props: { remaining: number; limit: number; window: string }) {
   const { theme } = useTheme()
-  
+
   // Clamp remaining to be >= 0 and <= limit to handle edge cases
   // (e.g., first message hitting rate limits where remaining could be 0 or negative)
-  const safeRemaining = createMemo(() => 
-    Math.max(0, Math.min(props.remaining ?? 0, props.limit ?? 0))
-  )
-  
+  const safeRemaining = createMemo(() => Math.max(0, Math.min(props.remaining ?? 0, props.limit ?? 0)))
+
   // If limit is 0 or missing, show 0% (empty bar) not 100% (full bar)
-  const percentRemaining = createMemo(() => 
-    props.limit > 0 ? (safeRemaining() / props.limit) * 100 : 0
-  )
-  
+  const percentRemaining = createMemo(() => (props.limit > 0 ? (safeRemaining() / props.limit) * 100 : 0))
+
   // Bar width fits in column
   const barWidth = 10
   const filledBlocks = createMemo(() => Math.round((percentRemaining() / 100) * barWidth))
@@ -51,14 +44,14 @@ function RateLimitRow(props: {
     const empty = barWidth - filled
     return "█".repeat(filled) + "░".repeat(empty)
   })
-  
+
   const barColor = createMemo(() => {
     const percent = percentRemaining()
     if (percent >= 50) return theme.success
     if (percent >= 20) return theme.warning
     return theme.error
   })
-  
+
   // Window label
   const windowLabel = () => {
     if (props.window === "minute") return "min"
@@ -66,10 +59,12 @@ function RateLimitRow(props: {
     if (props.window === "day") return "day"
     return props.window
   }
-  
+
   return (
     <box flexDirection="row" gap={1}>
-      <text fg={theme.textMuted} width={4}>{windowLabel()}</text>
+      <text fg={theme.textMuted} width={4}>
+        {windowLabel()}
+      </text>
       <text>
         <span style={{ fg: barColor() }}>{progressBar()}</span>
       </text>
@@ -77,18 +72,13 @@ function RateLimitRow(props: {
   )
 }
 
-function ContextProgressBar(props: {
-  used: number
-  limit: number
-}) {
+function ContextProgressBar(props: { used: number; limit: number }) {
   const { theme } = useTheme()
-  
-  const percentUsed = createMemo(() => 
-    props.limit > 0 ? Math.min(100, (props.used / props.limit) * 100) : 0
-  )
-  
+
+  const percentUsed = createMemo(() => (props.limit > 0 ? Math.min(100, (props.used / props.limit) * 100) : 0))
+
   const percentRemaining = createMemo(() => 100 - percentUsed())
-  
+
   const barWidth = 20
   const filledBlocks = createMemo(() => Math.round((percentUsed() / 100) * barWidth))
   const progressBar = createMemo(() => {
@@ -96,7 +86,7 @@ function ContextProgressBar(props: {
     const empty = barWidth - filled
     return "█".repeat(filled) + "░".repeat(empty)
   })
-  
+
   // Color based on remaining (green = plenty left, red = almost full)
   const barColor = createMemo(() => {
     const remaining = percentRemaining()
@@ -104,13 +94,13 @@ function ContextProgressBar(props: {
     if (remaining >= 20) return theme.warning
     return theme.error
   })
-  
+
   const formatTokens = (tokens: number): string => {
     if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
     if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
     return tokens.toLocaleString()
   }
-  
+
   return (
     <box>
       <box flexDirection="row" gap={1}>
@@ -127,11 +117,11 @@ function ContextProgressBar(props: {
 }
 
 // Visual representation of cache hit rate
-function CacheVisual(props: { 
+function CacheVisual(props: {
   hitRate: number
   cachedTokens: number
   promptTokens: number
-  recentRates: number[]  // Last 10 message hit rates
+  recentRates: number[] // Last 10 message hit rates
 }) {
   const { theme } = useTheme()
 
@@ -198,9 +188,7 @@ function CacheVisual(props: {
       {/* Wheel indicator with percentage and face */}
       <box flexDirection="row" gap={1}>
         <text style={{ fg: rateColor() }}>{pieIndicator()}</text>
-        <text fg={theme.textMuted}>
-          {props.hitRate.toFixed(1)}% hit rate
-        </text>
+        <text fg={theme.textMuted}>{props.hitRate.toFixed(1)}% hit rate</text>
         <text>{faceIndicator()}</text>
       </box>
       {/* Progress bar with sparkline bar chart */}
@@ -209,11 +197,7 @@ function CacheVisual(props: {
           <span style={{ fg: rateColor() }}>{progressBar()}</span>
         </text>
         <text>
-          <For each={sparkline()}>
-            {(item) => (
-              <span style={{ fg: item.color }}>{item.char}</span>
-            )}
-          </For>
+          <For each={sparkline()}>{(item) => <span style={{ fg: item.color }}>{item.char}</span>}</For>
         </text>
       </box>
       {/* Token counts */}
@@ -297,14 +281,14 @@ export function Sidebar(props: { sessionID: string }) {
   const apiTier = createMemo(() => {
     const info = rateLimitInfo()
     if (!info) return null
-    
+
     // Find minute limits
-    const requestsPerMin = info.requestLimits?.find(w => w.window === "minute")?.limit
-    const tokensPerMin = info.tokenLimits?.find(w => w.window === "minute")?.limit
-    const tokensPerDay = info.tokenLimits?.find(w => w.window === "day")?.limit
-    
+    const requestsPerMin = info.requestLimits?.find((w) => w.window === "minute")?.limit
+    const tokensPerMin = info.tokenLimits?.find((w) => w.window === "minute")?.limit
+    const tokensPerDay = info.tokenLimits?.find((w) => w.window === "day")?.limit
+
     if (requestsPerMin === undefined) return null
-    
+
     if (requestsPerMin <= 10) {
       return { name: "Free Tier", color: theme.textMuted }
     } else if (requestsPerMin <= 50) {
@@ -317,9 +301,7 @@ export function Sidebar(props: { sessionID: string }) {
   })
 
   const hasSuccessfulRequest = createMemo(() => {
-    const completedAssistants = messages().filter(
-      (m) => m.role === "assistant" && m.time.completed
-    )
+    const completedAssistants = messages().filter((m) => m.role === "assistant" && m.time.completed)
     return completedAssistants.length > 0
   })
 
@@ -344,14 +326,44 @@ export function Sidebar(props: { sessionID: string }) {
 
   // Calculate per-message cache hit rates for completed assistant messages
   const perMessageCacheRates = createMemo(() => {
-    const assistants = messages().filter(
-      (m) => m.role === "assistant" && m.time.completed
-    ) as AssistantMessage[]
+    const assistants = messages().filter((m) => m.role === "assistant" && m.time.completed) as AssistantMessage[]
     return assistants.map((msg) => {
       const cached = msg.tokens.cache.read
       const total = msg.tokens.input + cached
       return total > 0 ? (cached / total) * 100 : 0
     })
+  })
+
+  // Get custom rate limit usage from tracker
+  const [customRateLimitUsage, setCustomRateLimitUsage] = createSignal<
+    Record<
+      string,
+      {
+        requests: { count: number; limit?: number }
+        tokens: { count: number; limit?: number }
+      }
+    >
+  >({})
+
+  // Fetch custom rate limit usage when model changes
+  createEffect(async () => {
+    const currentModel = local.model.current()
+    if (!currentModel?.providerID || !currentModel?.modelID) {
+      setCustomRateLimitUsage({})
+      return
+    }
+
+    try {
+      const usage = await getUsage(currentModel.providerID, currentModel.modelID)
+      setCustomRateLimitUsage(usage)
+    } catch {
+      setCustomRateLimitUsage({})
+    }
+  })
+
+  const hasCustomRateLimits = createMemo(() => {
+    const usage = customRateLimitUsage()
+    return Object.keys(usage).length > 0
   })
 
   // Monitor for consecutive low cache hit rates
@@ -440,13 +452,8 @@ export function Sidebar(props: { sessionID: string }) {
               <text fg={theme.text}>
                 <b>Context</b>
               </text>
-              <Show when={context()} fallback={
-                <text fg={theme.textMuted}>No requests yet</text>
-              }>
-                <ContextProgressBar
-                  used={context()!.used}
-                  limit={context()!.limit}
-                />
+              <Show when={context()} fallback={<text fg={theme.textMuted}>No requests yet</text>}>
+                <ContextProgressBar used={context()!.used} limit={context()!.limit} />
               </Show>
               <text fg={theme.textMuted}>
                 Requests: {usage().total} (1m {usage().min1} / 1h {usage().hour1} / 24h {usage().day1})
@@ -472,9 +479,7 @@ export function Sidebar(props: { sessionID: string }) {
                     <b>Rate Limits</b>
                   </text>
                   <Show when={apiTier()}>
-                    <text style={{ fg: apiTier()!.color }}>
-                      [{apiTier()!.name}]
-                    </text>
+                    <text style={{ fg: apiTier()!.color }}>[{apiTier()!.name}]</text>
                   </Show>
                 </box>
                 <box flexDirection="row" gap={2}>
@@ -501,6 +506,48 @@ export function Sidebar(props: { sessionID: string }) {
                           limit={windowInfo.limit}
                           window={windowInfo.window}
                         />
+                      )}
+                    </For>
+                  </box>
+                </box>
+              </box>
+            </Show>
+            <Show when={hasCustomRateLimits()}>
+              <box>
+                <box flexDirection="row" gap={1}>
+                  <text fg={theme.text}>
+                    <b>Custom Limits</b>
+                  </text>
+                  <text fg={theme.textMuted}>[Configured]</text>
+                </box>
+                <box flexDirection="row" gap={2}>
+                  {/* Tokens column */}
+                  <box flexGrow={1} gap={1}>
+                    <text fg={theme.textMuted}>Tokens</text>
+                    <For each={Object.entries(customRateLimitUsage())}>
+                      {([window, usage]) => (
+                        <Show when={usage.tokens.limit}>
+                          <RateLimitRow
+                            remaining={usage.tokens.limit! - usage.tokens.count}
+                            limit={usage.tokens.limit!}
+                            window={window}
+                          />
+                        </Show>
+                      )}
+                    </For>
+                  </box>
+                  {/* Requests column */}
+                  <box flexGrow={1} gap={1}>
+                    <text fg={theme.textMuted}>Requests</text>
+                    <For each={Object.entries(customRateLimitUsage())}>
+                      {([window, usage]) => (
+                        <Show when={usage.requests.limit}>
+                          <RateLimitRow
+                            remaining={usage.requests.limit! - usage.requests.count}
+                            limit={usage.requests.limit!}
+                            window={window}
+                          />
+                        </Show>
                       )}
                     </For>
                   </box>

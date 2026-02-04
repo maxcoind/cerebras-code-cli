@@ -11,7 +11,13 @@ import { lazy } from "../util/lazy"
 import { NamedError } from "@opencode-ai/util/error"
 import { Flag } from "../flag/flag"
 import { Auth } from "../auth"
-import { type ParseError as JsoncParseError, applyEdits, modify, parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
+import {
+  type ParseError as JsoncParseError,
+  applyEdits,
+  modify,
+  parse as parseJsonc,
+  printParseErrorCode,
+} from "jsonc-parser"
 import { Instance } from "../project/instance"
 import { LSPServer } from "../lsp/server"
 import { BunProc } from "@/bun"
@@ -23,6 +29,44 @@ import { GlobalBus } from "@/bus/global"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
+
+  export async function getRateLimits(
+    providerID: string,
+    modelID: string,
+  ): Promise<Record<string, { requests?: number; tokens?: number }> | undefined> {
+    const config = await get()
+    const providerConfig = config.provider?.[providerID]
+
+    if (!providerConfig) return undefined
+
+    const modelRateLimit = providerConfig.models?.[modelID]?.rateLimit
+    const providerRateLimit = providerConfig.rateLimit
+
+    if (!modelRateLimit && !providerRateLimit) return undefined
+
+    const merged: Record<string, { requests?: number; tokens?: number }> = {}
+
+    if (providerRateLimit) {
+      for (const [window, limit] of Object.entries(providerRateLimit)) {
+        merged[window] = { requests: limit.requests }
+      }
+    }
+
+    if (modelRateLimit) {
+      for (const [window, limit] of Object.entries(modelRateLimit)) {
+        if (merged[window]) {
+          merged[window] = {
+            requests: limit.requests ?? merged[window].requests,
+            tokens: limit.tokens,
+          }
+        } else {
+          merged[window] = { requests: limit.requests, tokens: limit.tokens }
+        }
+      }
+    }
+
+    return Object.keys(merged).length > 0 ? merged : undefined
+  }
 
   // Custom merge function that concatenates plugin arrays instead of replacing them
   function mergeConfigWithPlugins(target: Info, source: Info): Info {
@@ -507,7 +551,32 @@ export namespace Config {
     .extend({
       whitelist: z.array(z.string()).optional(),
       blacklist: z.array(z.string()).optional(),
-      models: z.record(z.string(), ModelsDev.Model.partial()).optional(),
+      models: z
+        .record(
+          z.string(),
+          ModelsDev.Model.partial().extend({
+            rateLimit: z
+              .record(
+                z.string(),
+                z.object({
+                  requests: z.number().optional().describe("Maximum number of requests in this time window"),
+                  tokens: z.number().optional().describe("Maximum number of tokens in this time window"),
+                }),
+              )
+              .optional()
+              .describe("Rate limits by time window (e.g., '1s', '1m', '1h', '1d')"),
+          }),
+        )
+        .optional(),
+      rateLimit: z
+        .record(
+          z.string(),
+          z.object({
+            requests: z.number().optional().describe("Maximum number of requests in this time window"),
+          }),
+        )
+        .optional()
+        .describe("Provider-level request rate limits by time window (token limits only at model level)"),
       options: z
         .object({
           apiKey: z.string().optional(),

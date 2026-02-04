@@ -1,5 +1,6 @@
 import type { NamedError } from "@opencode-ai/util/error"
 import { MessageV2 } from "./message-v2"
+import { RateLimitExceededError } from "@/ratelimit"
 
 export namespace SessionRetry {
   export const RETRY_MAX_DELAY = 60_000 // absolute cap per retry (ms)
@@ -49,7 +50,12 @@ export namespace SessionRetry {
     return undefined
   }
 
-  export function delay(attempt: number, error?: MessageV2.APIError): number | undefined {
+  export function delay(attempt: number, error?: MessageV2.APIError | NamedError): number | undefined {
+    // Rate limit errors have exact timing from the error
+    if (error && RateLimitExceededError.isInstance(error)) {
+      return Math.min(error.data.retryAfterMs, RETRY_MAX_DELAY)
+    }
+
     // Estimate cumulative wait so far: geometric series BASE_DELAY * (2^(attempt) - 2)
     const cumulativeEstimate = BASE_DELAY * (Math.pow(2, attempt) - 2)
     if (cumulativeEstimate >= msUntilNextHour()) return undefined
@@ -60,7 +66,7 @@ export namespace SessionRetry {
     let computed = Math.min(Math.round(exponential * jitter), RETRY_MAX_DELAY)
 
     // Prefer server guidance when it asks for longer than our calculation
-    if (error) {
+    if (error && MessageV2.APIError.isInstance(error)) {
       const server = serverDelay(error)
       if (server !== undefined) {
         computed = Math.min(Math.max(computed, server), RETRY_MAX_DELAY)
@@ -71,6 +77,10 @@ export namespace SessionRetry {
   }
 
   export function retryable(error: ReturnType<NamedError["toObject"]>) {
+    if (RateLimitExceededError.isInstance(error)) {
+      return error.data.message
+    }
+
     if (MessageV2.APIError.isInstance(error)) {
       if (!error.data.isRetryable) return undefined
       return error.data.message.includes("Overloaded") ? "Provider is overloaded" : error.data.message
