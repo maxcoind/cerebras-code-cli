@@ -1,5 +1,19 @@
 import { Bus } from "@/bus"
+import { NamedError } from "@opencode-ai/util/error"
 import z from "zod"
+import * as Tracker from "./tracker"
+
+export const RateLimitExceededError = NamedError.create(
+  "RateLimitExceededError",
+  z.object({
+    message: z.string(),
+    window: z.string(),
+    metric: z.enum(["requests", "tokens"]),
+    limit: z.number(),
+    current: z.number(),
+    retryAfterMs: z.number(),
+  }),
+)
 
 export namespace RateLimit {
   export const WindowInfo = z.object({
@@ -84,7 +98,7 @@ export namespace RateLimit {
         const limitNum = parseInt(limit, 10)
         // Skip if values aren't valid numbers
         if (isNaN(remainingNum) || isNaN(limitNum)) return
-        
+
         const windowInfo: WindowInfo = {
           remaining: remainingNum,
           limit: limitNum,
@@ -100,17 +114,71 @@ export namespace RateLimit {
     }
 
     // Parse all time windows for requests
-    parseWindow("requests", "minute", "x-ratelimit-remaining-requests-minute", "x-ratelimit-limit-requests-minute", "x-ratelimit-reset-requests-minute")
-    parseWindow("requests", "hour", "x-ratelimit-remaining-requests-hour", "x-ratelimit-limit-requests-hour", "x-ratelimit-reset-requests-hour")
-    parseWindow("requests", "day", "x-ratelimit-remaining-requests-day", "x-ratelimit-limit-requests-day", "x-ratelimit-reset-requests-day")
-    parseWindow("requests", "unknown", "x-ratelimit-remaining-requests", "x-ratelimit-limit-requests", "x-ratelimit-reset-requests")
-    parseWindow("requests", "unknown", "ratelimit-remaining-requests", "ratelimit-limit-requests", "ratelimit-reset-requests")
+    parseWindow(
+      "requests",
+      "minute",
+      "x-ratelimit-remaining-requests-minute",
+      "x-ratelimit-limit-requests-minute",
+      "x-ratelimit-reset-requests-minute",
+    )
+    parseWindow(
+      "requests",
+      "hour",
+      "x-ratelimit-remaining-requests-hour",
+      "x-ratelimit-limit-requests-hour",
+      "x-ratelimit-reset-requests-hour",
+    )
+    parseWindow(
+      "requests",
+      "day",
+      "x-ratelimit-remaining-requests-day",
+      "x-ratelimit-limit-requests-day",
+      "x-ratelimit-reset-requests-day",
+    )
+    parseWindow(
+      "requests",
+      "unknown",
+      "x-ratelimit-remaining-requests",
+      "x-ratelimit-limit-requests",
+      "x-ratelimit-reset-requests",
+    )
+    parseWindow(
+      "requests",
+      "unknown",
+      "ratelimit-remaining-requests",
+      "ratelimit-limit-requests",
+      "ratelimit-reset-requests",
+    )
 
     // Parse all time windows for tokens
-    parseWindow("tokens", "minute", "x-ratelimit-remaining-tokens-minute", "x-ratelimit-limit-tokens-minute", "x-ratelimit-reset-tokens-minute")
-    parseWindow("tokens", "hour", "x-ratelimit-remaining-tokens-hour", "x-ratelimit-limit-tokens-hour", "x-ratelimit-reset-tokens-hour")
-    parseWindow("tokens", "day", "x-ratelimit-remaining-tokens-day", "x-ratelimit-limit-tokens-day", "x-ratelimit-reset-tokens-day")
-    parseWindow("tokens", "unknown", "x-ratelimit-remaining-tokens", "x-ratelimit-limit-tokens", "x-ratelimit-reset-tokens")
+    parseWindow(
+      "tokens",
+      "minute",
+      "x-ratelimit-remaining-tokens-minute",
+      "x-ratelimit-limit-tokens-minute",
+      "x-ratelimit-reset-tokens-minute",
+    )
+    parseWindow(
+      "tokens",
+      "hour",
+      "x-ratelimit-remaining-tokens-hour",
+      "x-ratelimit-limit-tokens-hour",
+      "x-ratelimit-reset-tokens-hour",
+    )
+    parseWindow(
+      "tokens",
+      "day",
+      "x-ratelimit-remaining-tokens-day",
+      "x-ratelimit-limit-tokens-day",
+      "x-ratelimit-reset-tokens-day",
+    )
+    parseWindow(
+      "tokens",
+      "unknown",
+      "x-ratelimit-remaining-tokens",
+      "x-ratelimit-limit-tokens",
+      "x-ratelimit-reset-tokens",
+    )
     parseWindow("tokens", "unknown", "ratelimit-remaining-tokens", "ratelimit-limit-tokens", "ratelimit-reset-tokens")
 
     // Find the most restrictive limits (lowest percentage remaining)
@@ -183,3 +251,5 @@ export namespace RateLimit {
     return { ...state().data }
   }
 }
+
+export * from "./tracker"
