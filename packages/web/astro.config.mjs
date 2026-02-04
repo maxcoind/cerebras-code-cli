@@ -69,6 +69,7 @@ export default defineConfig({
             "rules",
             "agents",
             "models",
+            "rate-limits",
             "themes",
             "keybinds",
             "commands",

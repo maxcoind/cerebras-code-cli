@@ -1,7 +1,16 @@
 import { Bus } from "@/bus"
 import { NamedError } from "@opencode-ai/util/error"
 import z from "zod"
-import * as Tracker from "./tracker"
+import {
+  checkLimit,
+  recordRequest,
+  recordTokens,
+  getUsage,
+  calculatePacingDelay,
+  type RateLimitWindow,
+  type CheckResult,
+  type RateLimitError,
+} from "./tracker"
 
 export const RateLimitExceededError = NamedError.create(
   "RateLimitExceededError",

@@ -237,3 +237,50 @@ export async function getUsage(
 
   return result
 }
+
+export async function calculatePacingDelay(
+  providerID: string,
+  modelID: string,
+  limits: Record<string, RateLimitWindow>,
+  thresholdPercent = 80,
+  minimumDelayMs = 1000,
+): Promise<number> {
+  using _ = await Lock.read(LOCK_KEY)
+  const data = await getTrackerData()
+  const key = getWindowKey(providerID, modelID)
+  const modelData = data[key] || {}
+
+  const now = Date.now()
+  let maxDelayMs = 0
+
+  for (const [windowKey, limit] of Object.entries(limits)) {
+    const windowMs = parseWindow(windowKey)
+    const windowData = modelData[windowKey] || { requests: [], tokens: [] }
+
+    const cleanedRequests = cleanupEntries(windowData.requests, windowMs)
+    const cleanedTokens = cleanupEntries(windowData.tokens, windowMs)
+
+    const requestCount = cleanedRequests.reduce((sum, entry) => sum + entry.count, 0)
+    const tokenCount = cleanedTokens.reduce((sum, entry) => sum + entry.input + entry.output + entry.reasoning, 0)
+
+    if (limit.requests && requestCount > 0) {
+      const usagePercent = (requestCount / limit.requests) * 100
+      if (usagePercent >= thresholdPercent) {
+        const proportionOverThreshold = (usagePercent - thresholdPercent) / (100 - thresholdPercent)
+        const graduatedDelay = minimumDelayMs + proportionOverThreshold * (windowMs - minimumDelayMs)
+        maxDelayMs = Math.max(maxDelayMs, graduatedDelay)
+      }
+    }
+
+    if (limit.tokens && tokenCount > 0) {
+      const usagePercent = (tokenCount / limit.tokens) * 100
+      if (usagePercent >= thresholdPercent) {
+        const proportionOverThreshold = (usagePercent - thresholdPercent) / (100 - thresholdPercent)
+        const graduatedDelay = minimumDelayMs + proportionOverThreshold * (windowMs - minimumDelayMs)
+        maxDelayMs = Math.max(maxDelayMs, graduatedDelay)
+      }
+    }
+  }
+
+  return Math.max(maxDelayMs, 0) >= minimumDelayMs ? Math.max(maxDelayMs, minimumDelayMs) : 0
+}

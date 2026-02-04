@@ -14,7 +14,7 @@ import { Plugin } from "@/plugin"
 import { Provider } from "@/provider/provider"
 import { Telemetry } from "@/telemetry"
 import { Config } from "@/config/config"
-import { checkLimit, recordRequest, recordTokens, RateLimitExceededError } from "@/ratelimit"
+import { checkLimit, recordRequest, recordTokens, RateLimitExceededError, calculatePacingDelay } from "@/ratelimit"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -58,18 +58,37 @@ export namespace SessionProcessor {
             const rateLimits = await Config.getRateLimits(input.model.providerID, input.model.id)
 
             if (rateLimits) {
-              const checkResult = await checkLimit(input.model.providerID, input.model.id, rateLimits)
+              let shouldPace = true
+              while (shouldPace) {
+                const pacingDelay = await calculatePacingDelay(input.model.providerID, input.model.id, rateLimits)
 
-              if (!checkResult.allowed) {
-                const error = checkResult.error!
-                throw new RateLimitExceededError({
-                  message: `Rate limit exceeded: ${error.limit} ${error.metric} per ${error.window}`,
-                  window: error.window,
-                  metric: error.metric,
-                  limit: error.limit,
-                  current: error.current,
-                  retryAfterMs: error.retryAfterMs,
-                })
+                if (pacingDelay > 0) {
+                  log.info("Rate limit pacing", { delay: pacingDelay })
+                  SessionStatus.set(input.sessionID, {
+                    type: "retry",
+                    attempt: 0,
+                    message: `Pacing requests (${Math.round(pacingDelay / 1000)}s delay)...`,
+                    next: 0,
+                  })
+                  await SessionRetry.sleep(pacingDelay, input.abort)
+                  SessionStatus.set(input.sessionID, { type: "idle" })
+                } else {
+                  shouldPace = false
+                }
+
+                const checkResult = await checkLimit(input.model.providerID, input.model.id, rateLimits)
+
+                if (!checkResult.allowed) {
+                  const error = checkResult.error!
+                  throw new RateLimitExceededError({
+                    message: `Rate limit exceeded: ${error.limit} ${error.metric} per ${error.window}`,
+                    window: error.window,
+                    metric: error.metric,
+                    limit: error.limit,
+                    current: error.current,
+                    retryAfterMs: error.retryAfterMs,
+                  })
+                }
               }
 
               await recordRequest(input.model.providerID, input.model.id, Object.keys(rateLimits))

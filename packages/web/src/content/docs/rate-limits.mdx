@@ -1,0 +1,137 @@
+---
+title: Rate Limits
+description: Monitor and manage API rate limits.
+---
+
+Rate limits help track your API usage and prevent hitting quotas.
+
+---
+
+## View rate limits
+
+Rate limit info appears in the TUI sidebar after your first request.
+
+The display shows two types of limits:
+
+- **Provider limits**: Set by your API provider
+- **Custom limits**: Configured in your `opencode.json`
+
+---
+
+## Understand the display
+
+Rate limits show as progress bars with labels.
+
+**Bars indicate**:
+
+- Green: 50%+ remaining
+- Yellow: 20-49% remaining
+- Red: Less than 20% remaining
+
+**Labels indicate**:
+
+- `min`: Per-minute window
+- `hour`: Per-hour window
+- `day`: Per-day window
+
+---
+
+## Token and request limits
+
+OpenCode tracks both token and request limits.
+
+**Tokens**: Count input and output tokens used.
+
+**Requests**: Count the number of API calls made.
+
+Both show side by side for each time window.
+
+---
+
+## Configure custom limits
+
+Add rate limits to your `opencode.json` config.
+
+```json title="opencode.json" {5-9}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openai": {
+      "rateLimit": {
+        "minute": 100,
+        "hour": 5000
+      }
+    }
+  }
+}
+```
+
+---
+
+## Model-specific limits
+
+Set limits for individual models.
+
+```json title="opencode.json" {6-9}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-4": {
+          "rateLimit": {
+            "minute": 50
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Provider vs model limits
+
+Provider limits apply to all models.
+
+Model limits override provider limits for that model.
+
+Use provider limits for general quotas.
+
+Use model limits for specific constraints.
+
+---
+
+## Token-only limits
+
+Model-level limits can restrict tokens only.
+
+```json title="opencode.json" {6-9}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-4": {
+          "rateLimit": {
+            "tokens": {
+              "minute": 100000
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Why am I getting rate limited?
+
+Click the rate limit banner to learn more.
+
+This explains your API tier and limits.
+
+The dialog shows how to upgrade or reduce usage.
