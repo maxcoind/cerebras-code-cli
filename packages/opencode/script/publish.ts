@@ -10,8 +10,8 @@ process.chdir(dir)
 const { binaries } = await import("./build.ts")
 {
   const name = `${pkg.name}-${process.platform}-${process.arch}`
-  console.log(`smoke test: running dist/${name}/bin/opencode --version`)
-  await $`./dist/${name}/bin/opencode --version`
+  console.log(`smoke test: running dist/${name}/bin/cerebras --version`)
+  await $`./dist/${name}/bin/cerebras --version`
 }
 
 await $`mkdir -p ./dist/${pkg.name}`
@@ -67,10 +67,10 @@ if (!Script.preview) {
   }
 
   // Calculate SHA values
-  const arm64Sha = await $`sha256sum ./dist/opencode-linux-arm64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
-  const x64Sha = await $`sha256sum ./dist/opencode-linux-x64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
-  const macX64Sha = await $`sha256sum ./dist/opencode-darwin-x64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
-  const macArm64Sha = await $`sha256sum ./dist/opencode-darwin-arm64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
+  const arm64Sha = await $`sha256sum ./dist/cerebras-linux-arm64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
+  const x64Sha = await $`sha256sum ./dist/cerebras-linux-x64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
+  const macX64Sha = await $`sha256sum ./dist/cerebras-darwin-x64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
+  const macArm64Sha = await $`sha256sum ./dist/cerebras-darwin-arm64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
 
   const [pkgver, _subver = ""] = Script.version.split(/(-.*)/, 2)
 
@@ -79,62 +79,62 @@ if (!Script.preview) {
     "# Maintainer: dax",
     "# Maintainer: adam",
     "",
-    "pkgname='opencode-bin'",
+    "pkgname='cerebras-bin'",
     `pkgver=${pkgver}`,
     `_subver=${_subver}`,
     "options=('!debug' '!strip')",
     "pkgrel=1",
     "pkgdesc='The AI coding agent built for the terminal.'",
-    "url='https://github.com/sst/opencode'",
+    "url='https://github.com/kevint-cerebras/cerebras-code-cli'",
     "arch=('aarch64' 'x86_64')",
     "license=('MIT')",
-    "provides=('opencode')",
-    "conflicts=('opencode')",
+    "provides=('cerebras')",
+    "conflicts=('cerebras')",
     "depends=('fzf' 'ripgrep')",
     "",
-    `source_aarch64=("\${pkgname}_\${pkgver}_aarch64.tar.gz::https://github.com/sst/opencode/releases/download/v\${pkgver}\${_subver}/opencode-linux-arm64.tar.gz")`,
+    `source_aarch64=("\${pkgname}_\${pkgver}_aarch64.tar.gz::https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v\${pkgver}\${_subver}/cerebras-linux-arm64.tar.gz")`,
     `sha256sums_aarch64=('${arm64Sha}')`,
 
-    `source_x86_64=("\${pkgname}_\${pkgver}_x86_64.tar.gz::https://github.com/sst/opencode/releases/download/v\${pkgver}\${_subver}/opencode-linux-x64.tar.gz")`,
+    `source_x86_64=("\${pkgname}_\${pkgver}_x86_64.tar.gz::https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v\${pkgver}\${_subver}/cerebras-linux-x64.tar.gz")`,
     `sha256sums_x86_64=('${x64Sha}')`,
     "",
     "package() {",
-    '  install -Dm755 ./opencode "${pkgdir}/usr/bin/opencode"',
+    '  install -Dm755 ./cerebras "${pkgdir}/usr/bin/cerebras"',
     "}",
     "",
   ].join("\n")
 
-  // Source-based PKGBUILD for opencode
+  // Source-based PKGBUILD for cerebras
   const sourcePkgbuild = [
     "# Maintainer: dax",
     "# Maintainer: adam",
     "",
-    "pkgname='opencode'",
+    "pkgname='cerebras'",
     `pkgver=${pkgver}`,
     `_subver=${_subver}`,
     "options=('!debug' '!strip')",
     "pkgrel=1",
     "pkgdesc='The AI coding agent built for the terminal.'",
-    "url='https://github.com/sst/opencode'",
+    "url='https://github.com/kevint-cerebras/cerebras-code-cli'",
     "arch=('aarch64' 'x86_64')",
     "license=('MIT')",
-    "provides=('opencode')",
-    "conflicts=('opencode-bin')",
+    "provides=('cerebras')",
+    "conflicts=('cerebras-bin')",
     "depends=('fzf' 'ripgrep')",
     "makedepends=('git' 'bun-bin' 'go')",
     "",
-    `source=("opencode-\${pkgver}.tar.gz::https://github.com/sst/opencode/archive/v\${pkgver}\${_subver}.tar.gz")`,
+    `source=("cerebras-\${pkgver}.tar.gz::https://github.com/kevint-cerebras/cerebras-code-cli/archive/v\${pkgver}\${_subver}.tar.gz")`,
     `sha256sums=('SKIP')`,
     "",
     "build() {",
-    `  cd "opencode-\${pkgver}"`,
+    `  cd "cerebras-\${pkgver}"`,
     `  bun install`,
     "  cd ./packages/opencode",
     `  OPENCODE_CHANNEL=latest OPENCODE_VERSION=${pkgver} bun run ./script/build.ts --single`,
     "}",
     "",
     "package() {",
-    `  cd "opencode-\${pkgver}/packages/opencode"`,
+    `  cd "cerebras-\${pkgver}/packages/opencode"`,
     '  mkdir -p "${pkgdir}/usr/bin"',
     '  target_arch="x64"',
     '  case "$CARCH" in',
@@ -157,19 +157,19 @@ if (!Script.preview) {
     '      base="-baseline"',
     "    fi",
     "  fi",
-    '  bin="dist/opencode-linux-${target_arch}${base}${libc}/bin/opencode"',
+    '  bin="dist/cerebras-linux-${target_arch}${base}${libc}/bin/cerebras"',
     '  if [ ! -f "$bin" ]; then',
     '    printf "unable to find binary for %s%s%s\\n" "$target_arch" "$base" "$libc" >&2',
     "    return 1",
     "  fi",
-    '  install -Dm755 "$bin" "${pkgdir}/usr/bin/opencode"',
+    '  install -Dm755 "$bin" "${pkgdir}/usr/bin/cerebras"',
     "}",
     "",
   ].join("\n")
 
   for (const [pkg, pkgbuild] of [
-    ["opencode-bin", binaryPkgbuild],
-    ["opencode", sourcePkgbuild],
+    ["cerebras-bin", binaryPkgbuild],
+    ["cerebras", sourcePkgbuild],
   ]) {
     for (let i = 0; i < 30; i++) {
       try {
@@ -196,43 +196,43 @@ if (!Script.preview) {
     "# This file was generated by GoReleaser. DO NOT EDIT.",
     "class Opencode < Formula",
     `  desc "The AI coding agent built for the terminal."`,
-    `  homepage "https://github.com/sst/opencode"`,
+    `  homepage "https://github.com/kevint-cerebras/cerebras-code-cli"`,
     `  version "${Script.version.split("-")[0]}"`,
     "",
     `  depends_on "ripgrep"`,
     "",
     "  on_macos do",
     "    if Hardware::CPU.intel?",
-    `      url "https://github.com/sst/opencode/releases/download/v${Script.version}/opencode-darwin-x64.zip"`,
+    `      url "https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v${Script.version}/cerebras-darwin-x64.zip"`,
     `      sha256 "${macX64Sha}"`,
     "",
     "      def install",
-    '        bin.install "opencode"',
+    '        bin.install "cerebras"',
     "      end",
     "    end",
     "    if Hardware::CPU.arm?",
-    `      url "https://github.com/sst/opencode/releases/download/v${Script.version}/opencode-darwin-arm64.zip"`,
+    `      url "https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v${Script.version}/cerebras-darwin-arm64.zip"`,
     `      sha256 "${macArm64Sha}"`,
     "",
     "      def install",
-    '        bin.install "opencode"',
+    '        bin.install "cerebras"',
     "      end",
     "    end",
     "  end",
     "",
     "  on_linux do",
     "    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/sst/opencode/releases/download/v${Script.version}/opencode-linux-x64.tar.gz"`,
+    `      url "https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v${Script.version}/cerebras-linux-x64.tar.gz"`,
     `      sha256 "${x64Sha}"`,
     "      def install",
-    '        bin.install "opencode"',
+    '        bin.install "cerebras"',
     "      end",
     "    end",
     "    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/sst/opencode/releases/download/v${Script.version}/opencode-linux-arm64.tar.gz"`,
+    `      url "https://github.com/kevint-cerebras/cerebras-code-cli/releases/download/v${Script.version}/cerebras-linux-arm64.tar.gz"`,
     `      sha256 "${arm64Sha}"`,
     "      def install",
-    '        bin.install "opencode"',
+    '        bin.install "cerebras"',
     "      end",
     "    end",
     "  end",
@@ -243,12 +243,12 @@ if (!Script.preview) {
 
   await $`rm -rf ./dist/homebrew-tap`
   await $`git clone https://${process.env["GITHUB_TOKEN"]}@github.com/sst/homebrew-tap.git ./dist/homebrew-tap`
-  await Bun.file("./dist/homebrew-tap/opencode.rb").write(homebrewFormula)
-  await $`cd ./dist/homebrew-tap && git add opencode.rb`
+  await Bun.file("./dist/homebrew-tap/cerebras.rb").write(homebrewFormula)
+  await $`cd ./dist/homebrew-tap && git add cerebras.rb`
   await $`cd ./dist/homebrew-tap && git commit -m "Update to v${Script.version}"`
   await $`cd ./dist/homebrew-tap && git push`
 
-  const image = "ghcr.io/sst/opencode"
+  const image = "ghcr.io/kevint-cerebras/cerebras"
   await $`docker build -t ${image}:${Script.version} .`
   await $`docker push ${image}:${Script.version}`
   await $`docker tag ${image}:${Script.version} ${image}:latest`
